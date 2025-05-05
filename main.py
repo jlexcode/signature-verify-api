@@ -21,9 +21,24 @@ THRESHOLD = 0.15
 
 # Pydantic model to validate input
 
+class Point(BaseModel):
+    x: float
+    y: float
+    time: float
+    pressure: float
+
+class Stroke(BaseModel):
+    penColor: str
+    dotSize: float
+    minWidth: float
+    maxWidth: float
+    velocityFilterWeight: float
+    compositeOperation: str
+    points: List[Point]
+
 class SignatureInput(BaseModel):
     student_id: str
-    signature_path: List[List[Dict[str, float]]]  # List of strokes (list of points with x and y)
+    signature_path: List[Stroke]
 
 @app.get("/ping")
 def ping():
