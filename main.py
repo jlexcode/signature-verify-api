@@ -20,8 +20,6 @@ app.add_middleware(
 )
 
 
-app = FastAPI()
-
 # Load from environment or hardcode for now
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
