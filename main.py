@@ -6,6 +6,19 @@ import httpx
 import os
 from typing import List, Dict
 import numpy as np
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# Allow CORS from anywhere (or restrict to your domain)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace with ["https://yourdomain.com"] in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 app = FastAPI()
 
