@@ -5,3 +5,9 @@ python-multipart
 typing
 numpy
 httpx
+pydantic
+json
+os
+typing
+PIL
+skimage.metrics
