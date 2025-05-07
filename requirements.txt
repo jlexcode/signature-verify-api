@@ -6,7 +6,6 @@ typing
 numpy
 httpx
 pydantic
-json
 os
 typing
 PIL
