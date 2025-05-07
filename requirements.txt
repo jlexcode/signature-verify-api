@@ -6,7 +6,6 @@ typing
 numpy
 httpx
 pydantic
-os
 typing
 PIL
 skimage.metrics
