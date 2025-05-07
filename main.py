@@ -116,4 +116,4 @@ def compare_signatures_ssim(path1: List[Stroke], path2: List[Stroke]) -> float:
     img2 = draw_signature_to_image(path2)
     arr1 = np.array(img1)
     arr2 = np.array(img2)
-    return ssim(arr1, arr2,  win_size=5, gaussian_weights=True, sigma=1.2)
+    return ssim(arr1, arr2,  win_size=3, gaussian_weights=True, sigma=.8, data_range=255)
