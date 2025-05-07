@@ -1,33 +1,33 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import json
-import math
 import httpx
 import os
-from typing import List, Dict
+from typing import List
 import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image, ImageDraw
+from skimage.metrics import structural_similarity as ssim
 
 app = FastAPI()
 
-# Allow CORS from anywhere (or restrict to your domain)
+# CORS middleware (for dev; restrict in production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with ["https://yourdomain.com"] in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# Load from environment or hardcode for now
+# Env vars
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
 
-# Set threshold
-THRESHOLD = 0.15
+# SSIM threshold
+THRESHOLD = 0.85  # You can tune this
 
-# Pydantic model to validate input
+# === Models ===
 class Point(BaseModel):
     x: float
     y: float
@@ -47,13 +47,14 @@ class SignatureInput(BaseModel):
     student_id: str
     signature_path: List[Stroke]
 
+# === Routes ===
 @app.get("/ping")
 def ping():
     return {"message": "pong"}
 
 @app.post("/verify")
 async def verify_signature(payload: SignatureInput):
-    # Fetch reference signature from Supabase
+    # Fetch reference from Supabase
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -63,46 +64,56 @@ async def verify_signature(payload: SignatureInput):
         res = await client.get(
             f"{SUPABASE_URL}/rest/v1/signature_reference",
             headers=headers,
-            params={
-                "student_id": f"eq.{payload.student_id}",
-                "select": "*"
-            })
+            params={"student_id": f"eq.{payload.student_id}", "select": "*"}
+        )
 
     if res.status_code != 200 or not res.json():
         raise HTTPException(status_code=404, detail="Reference signature not found")
 
     reference = res.json()[0]
-    # Convert JSON string to list of Stroke objects
     ref_path = [Stroke(**s) for s in json.loads(reference['signature_path'])]
     submitted_path = payload.signature_path
 
-    # Run comparison
-    score = compare_paths(submitted_path, ref_path)
-    match = score < THRESHOLD
+    score = compare_signatures_ssim(submitted_path, ref_path)
+    match = score >= THRESHOLD
 
     return {"match": match, "score": round(score, 4)}
 
-def compare_paths(path1, path2, num_points=100):
-    def flatten_and_resample(path):
-        points = [pt for stroke in path for pt in stroke.points]
-        if len(points) < 2:
-            return np.zeros((num_points, 2))  # avoid div by zero
+# === SSIM Comparison Logic ===
+def draw_signature_to_image(strokes: List[Stroke], size=256) -> Image.Image:
+    img = Image.new("L", (size, size), 255)
+    draw = ImageDraw.Draw(img)
 
-        xs = np.array([pt.x for pt in points])
-        ys = np.array([pt.y for pt in points])
+    all_points = [pt for stroke in strokes for pt in stroke.points]
+    if not all_points:
+        return img
 
-        xs = (xs - xs.min()) / (xs.max() - xs.min() + 1e-6)
-        ys = (ys - ys.min()) / (ys.max() - ys.min() + 1e-6)
+    xs = [p.x for p in all_points]
+    ys = [p.y for p in all_points]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    width = max_x - min_x + 1e-6
+    height = max_y - min_y + 1e-6
 
-        coords = np.stack([xs, ys], axis=1)
+    def normalize(x, y):
+        return (
+            int(((x - min_x) / width) * (size - 1)),
+            int(((y - min_y) / height) * (size - 1))
+        )
 
-        if len(coords) < num_points:
-            coords = np.pad(coords, ((0, num_points - len(coords)), (0, 0)), mode='edge')
+    for stroke in strokes:
+        if len(stroke.points) < 2:
+            continue
+        for i in range(len(stroke.points) - 1):
+            p1 = normalize(stroke.points[i].x, stroke.points[i].y)
+            p2 = normalize(stroke.points[i+1].x, stroke.points[i+1].y)
+            draw.line([p1, p2], fill=0, width=2)
 
-        indices = np.linspace(0, len(coords) - 1, num_points).astype(int)
-        return coords[indices]
+    return img
 
-    pts1 = flatten_and_resample(path1)
-    pts2 = flatten_and_resample(path2)
-    distances = np.linalg.norm(pts1 - pts2, axis=1)
-    return float(np.mean(distances))
+def compare_signatures_ssim(path1: List[Stroke], path2: List[Stroke]) -> float:
+    img1 = draw_signature_to_image(path1)
+    img2 = draw_signature_to_image(path2)
+    arr1 = np.array(img1)
+    arr2 = np.array(img2)
+    return ssim(arr1, arr2)
