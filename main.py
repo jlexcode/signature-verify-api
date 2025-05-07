@@ -77,7 +77,7 @@ async def verify_signature(payload: SignatureInput):
     score = compare_signatures_ssim(submitted_path, ref_path)
     match = score >= THRESHOLD
 
-    return {"match": match, "score": round(score, 4)}
+    return {"match": bool(match), "score": round(score, 4)}
 
 # === SSIM Comparison Logic ===
 def draw_signature_to_image(strokes: List[Stroke], size=256) -> Image.Image:
