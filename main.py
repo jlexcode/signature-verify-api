@@ -44,7 +44,7 @@ class Stroke(BaseModel):
     points: List[Point]
 
 class SignatureInput(BaseModel):
-    student_id: str
+    participant_id: str
     signature_path: List[Stroke]
 
 # === Routes ===
@@ -64,7 +64,7 @@ async def verify_signature(payload: SignatureInput):
         res = await client.get(
             f"{SUPABASE_URL}/rest/v1/signature_reference",
             headers=headers,
-            params={"student_id": f"eq.{payload.student_id}", "select": "*"}
+            params={"participant_id": f"eq.{payload.participant_id}", "select": "*"}
         )
 
     if res.status_code != 200 or not res.json():
